@@ -1,7 +1,7 @@
 # ia-vuelos
 
 > [!important]
- Se necesita Docker: <https://docs.docker.com/get-docker/>
+> Se necesita Docker: <https://docs.docker.com/get-docker/>
 > y Git <https://git-scm.com/downloads>
 
 ## Preview
@@ -11,6 +11,7 @@
 ## Lanzar el proyecto en Docker
 
 Primero se clona el proyecto:
+
 ```sh
 git clone https://github.com/0rphee/ia-vuelos.git
 cd ia-vuelos
@@ -23,6 +24,7 @@ docker compose up --build
 ```
 
 Alternativamente, se puede usar este comando para lanzarlos otra vez cada que se modifica algún archivo:
+
 ```sh
 docker compose watch
 ```
@@ -47,3 +49,14 @@ pip3 install -r requirements.txt
 
 El dataset de los aeropuertos fue obtenido de <https://ourairports.com/data/>. (Los datos se importaron/modificaron inicialmente mediante la interfaz de phpMyAdmin).
 
+De todos los aeropuertos disponibles, para generar los vuelos se usan solamente aquellos que cumplen las siguientes condiciones:
+
+- Tienen servicio de aerolíneas/vuelos regular.
+- Según su tamaño:
+  - [x] "large_airport"
+  - [x] "medium_airport"
+  - [ ] "small_airport"
+  - [ ] "balloonport"
+  - [ ] "seaplane_base"
+  - [ ] "heliport"
+  - [ ] "closed"
