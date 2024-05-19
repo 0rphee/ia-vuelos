@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    develop:
+      watch:
+        - action: rebuild
+          path: src/
+        - action: rebuild
+          path: Dockerfile.python
+  db:
+    image: mysql:8.3
+    environment:
+      MYSQL_TCP_PORT: 3306 # default port
+      # MYSQL_DATABASE: steam_db
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: dbuser
+      MYSQL_PASSWORD: dbuser
+    ports:
+      - "3306:3306"
+    # volumes:
+    #   - ./data/steam_db.sql:/docker-entrypoint-initdb.d/steam_db.sql
+
+  phpmyadmin:
+    image: phpmyadmin:5-apache
+    environment:
+      UPLOAD_LIMIT: 300M
+    ports:
+      - "8080:80"
+  # frontend-dev:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.npm-dev
+  #   restart: always
+  #   ports: 
+  #     - "3000:3000"
+  #   volumes:
+  #     - ./proy-bda-frontend:/app/proy-bda-frontend  # Mount frontend code for development
+  #     - /app/proy-bda-frontend/node_modules/
+
