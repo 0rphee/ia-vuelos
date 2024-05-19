@@ -19,7 +19,7 @@ services:
     image: mysql:8.3
     environment:
       MYSQL_TCP_PORT: 3306 # default port
-      # MYSQL_DATABASE: steam_db
+      MYSQL_DATABASE: fly_data
       MYSQL_ROOT_PASSWORD: root
       MYSQL_USER: dbuser
       MYSQL_PASSWORD: dbuser

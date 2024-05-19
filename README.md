@@ -60,3 +60,14 @@ De todos los aeropuertos disponibles, para generar los vuelos se usan solamente 
   - [ ] "seaplane_base"
   - [ ] "heliport"
   - [ ] "closed"
+
+La generación de rutas se hizo tomando en cuenta dos modelos de avión:
+
+- Boeing 787-9:
+  - Velocidad de crucero: `~903 km/h`.
+  - Rango máximo: `14,140 km`.
+- Airbus A320neo:
+  - Velocidad de crucero: `~833 km/h`.
+  - Rango máximo: `6,500 km`.
+
+El código de generación de vuelos se encuentra en `scripts/gen_flights.py`, y solo es ejecutado una vez para popular la tabla `flights`.
