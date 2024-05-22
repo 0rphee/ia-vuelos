@@ -49,6 +49,24 @@ pip3 install -r requirements.txt
 
 El dataset de los aeropuertos fue obtenido de <https://ourairports.com/data/>. (Los datos se importaron/modificaron inicialmente mediante la interfaz de phpMyAdmin).
 
+### Llenar tabla de airports de `csv`
+
+```sh
+# Se ejecuta esto en la misma terminal, si no funciona leer siguiente párrafo
+mkdir data
+curl 'https://drive.usercontent.google.com/download?confirm=xxx&id=1v-btRsoMaFFdufc1zzx8zPPMt21-NcO0' -o data/airports.csv
+```
+
+Si el comando anterior no funciona, se descarga el archivo `airports.csv` y colocarlo en `data/`, de <https://drive.usercontent.google.com/download?confirm=xxx&id=1v-btRsoMaFFdufc1zzx8zPPMt21-NcO0>.
+
+Una vez descargado, se debe el servicio de docker de mysql debe estar corriendo, y se insertan la información a la base de datos ejecutando:
+
+```sh
+python3 scripts/populate_airports.py
+```
+
+### Generar datos de vuelos
+
 De todos los aeropuertos disponibles, para generar los vuelos se usan solamente aquellos que cumplen las siguientes condiciones:
 
 - Tienen servicio de aerolíneas/vuelos regular.
