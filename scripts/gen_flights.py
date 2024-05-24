@@ -105,8 +105,19 @@ def generate_dest_airport(
 
 
 def build_single_flight(
-    plane, orig_airport: Airport, dest_airport: Airport, date: datetime, distance_km: float
+    plane, all_airports: list[Airport], orig_airport: Airport, date: datetime
 ) -> Flight:
+
+    dest_airport, distance_km = generate_dest_airport(
+        all_airports,
+        orig_airport,
+    )
+    while (dest_airport.id == orig_airport.id) or (distance_km > plane["range"]):
+        dest_airport, distance_km = generate_dest_airport(
+            all_airports,
+            orig_airport,
+        )
+
     flight_id: str = generate_flight_id()
     duration_hours: float = calculate_duration(distance_km, plane["speed"])
     # the departure time is at a random time in the day
@@ -128,52 +139,73 @@ def build_single_flight(
     )
 
 
-def generate_flights(cursor: MySQLCursor) -> list[Flight]:
+def insert_flight(cursor: MySQLCursor, flight: Flight):
+    insert_query = """
+    INSERT INTO flights (
+        flight_id, model, price_business, price_economy, departure_time, arrival_time,
+        departure_airport_id, arrival_airport_id
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    cursor.execute(
+        insert_query,
+        (
+            flight.flight_id,
+            flight.model,
+            flight.price_business,
+            flight.price_economy,
+            flight.departure_time,
+            flight.arrival_time,
+            flight.departure_airport_id,
+            flight.arrival_airport_id,
+        ),
+    )
+
+
+def generate_flights(cursor: MySQLCursor):
     all_airports: list[Airport] = get_airports(cursor)
     dates = generate_all_dates()
-    flights: list[Flight] = []
 
     plane_models = [
         {"model": "Boeing 787-9", "speed": 903, "range": 14140},
         {"model": "Airbus A320neo", "speed": 833, "range": 6500},
     ]
 
+    PRINT_INTERVAL = 1
     count = 0
-    do_i_print = 24  # prints every 25 airports finished
+    do_i_print = PRINT_INTERVAL - 1  # prints every 25 airports finished
     for curr_orig_airport in all_airports:
         flights_per_day: int = 0
         if curr_orig_airport.type == "large_airport":
             flights_per_day = random.randint(5, 10)
-            long_haul_fligths = floor(flights_per_day * 0.5)
+            long_haul_flights = floor(flights_per_day * 0.5)
         else:
             flights_per_day = random.randint(1, 5)
-            long_haul_fligths = floor(flights_per_day * 0.2)
-        short_haul_fligths = flights_per_day - long_haul_fligths
+            long_haul_flights = floor(flights_per_day * 0.2)
+        short_haul_flights = flights_per_day - long_haul_flights
 
-        flight_indexes = ([0] * long_haul_fligths) + ([1] * short_haul_fligths)
+        flight_indexes = [0 for _ in range(long_haul_flights)] + [
+            1 for _ in range(short_haul_flights)
+        ]
         for date in dates:
             for plane_index in flight_indexes:
                 plane = plane_models[plane_index]
 
-                dest_airport, distance_km = generate_dest_airport(
-                    all_airports,
-                    curr_orig_airport,
-                )
-                while (dest_airport.id == curr_orig_airport.id) or (distance_km > plane["range"]):
-                    dest_airport, distance_km = generate_dest_airport(
-                        all_airports,
-                        curr_orig_airport,
-                    )
 
-                flight = build_single_flight(
-                    plane, curr_orig_airport, dest_airport, date, distance_km
-                )
-
-                flights.append(flight)
+                while True:
+                    flight = build_single_flight(plane, all_airports, curr_orig_airport, date)
+                    try:
+                        insert_flight(cursor, flight)
+                        break  # Exit the loop if insert is successful
+                    except mysql.connector.errors.IntegrityError as e:
+                        print("\n\nIntegrityError: Probably duplicate key:", e)
+                        print(f"\nIn Error Flight:\n{vars(flight)}\n")
+                    except Exception as e:
+                        print(f"\nEXITING\nError Flight:\n{vars(flight)}\nEXITING")
+                        raise e
 
         count += 1
         do_i_print += 1
-        if do_i_print == 25:
+        if do_i_print == PRINT_INTERVAL:
             # Actualizar el contador en la misma línea
             sys.stdout.write(f"\rAeropuertos terminados de generar: {count}")
             sys.stdout.flush()
@@ -181,7 +213,23 @@ def generate_flights(cursor: MySQLCursor) -> list[Flight]:
     sys.stdout.write(f"\rAeropuertos terminados de generar: {count}\n")
     sys.stdout.flush()
 
-    return flights
+
+def create_flights_table(cursor: MySQLCursor):
+    create_table_query = """
+    CREATE TABLE IF NOT EXISTS flights (
+        flight_id VARCHAR(10) PRIMARY KEY,
+        model VARCHAR(50),
+        price_business FLOAT,
+        price_economy FLOAT,
+        departure_time DATETIME,
+        arrival_time DATETIME,
+        departure_airport_id INT,
+        arrival_airport_id INT,
+        FOREIGN KEY (departure_airport_id) REFERENCES airports(id),
+        FOREIGN KEY (arrival_airport_id) REFERENCES airports(id)
+    )
+    """
+    cursor.execute(create_table_query)
 
 
 def main():
@@ -194,12 +242,14 @@ def main():
     )
 
     cursor: MySQLCursor = db_connection.cursor()
-    flights = generate_flights(cursor)
+    create_flights_table(cursor)
+    db_connection.commit()
+
+    generate_flights(cursor)
+    db_connection.commit()
+
     cursor.close()
     db_connection.close()
-    # Print some of the generated flights
-    for flight in flights[:10]:  # Just printing first 10 for brevity
-        print(vars(flight))
 
 
 if __name__ == "__main__":
