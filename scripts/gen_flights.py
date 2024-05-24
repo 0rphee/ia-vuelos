@@ -1,12 +1,12 @@
 import random
 import string
+import sys
 from datetime import datetime, timedelta
-from typing import Generator
+from math import floor
 
 import mysql.connector
 from geopy.distance import geodesic
 from mysql.connector.cursor import MySQLCursor
-from mysql.connector.types import RowType
 
 """
 Rows in 'airports' table, in 'fly_data'
@@ -15,7 +15,7 @@ Rows in 'airports' table, in 'fly_data'
 
 
 class Airport:
-    def __init__(self, row: RowType) -> None:
+    def __init__(self, row: tuple[int, str, str, str, float, float]) -> None:
         self.id: int = int(row[0])
         self.ident: str = str(row[1])
         self.type: str = str(row[2])
@@ -62,7 +62,7 @@ def get_airports(cursor: MySQLCursor) -> list[Airport]:
     """
     )
 
-    return list(map(Airport, cursor.fetchall()))
+    return list(map(lambda x: Airport(tuple(x)), cursor.fetchall()))
 
 
 def generate_flight_id() -> str:
@@ -72,12 +72,12 @@ def generate_flight_id() -> str:
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
 
-def calculate_duration(distance_km: int, speed_kmh: int) -> float:
+def calculate_duration(distance_km: float, speed_kmh: int) -> float:
     return distance_km / speed_kmh
 
 
 # Generate flight prices
-def generate_prices(distance_km: int) -> tuple[float, float]:
+def generate_prices(distance_km: float) -> tuple[float, float]:
     base_price_economy = distance_km * 0.1  # Example base price per km
     price_economy = base_price_economy * random.uniform(0.85, 1.15)
     price_business = price_economy * random.uniform(1.15, 1.25)
@@ -85,85 +85,101 @@ def generate_prices(distance_km: int) -> tuple[float, float]:
 
 
 # Generate dates for all days in 2024
-def generate_dates_for_2024() -> Generator[datetime, None, None]:
-    start_date = datetime(2024, 1, 1)
-    end_date = datetime(2024, 12, 31)
-    delta = end_date - start_date
-    return (start_date + timedelta(days=i) for i in range(delta.days + 1))
+def generate_all_dates() -> list[datetime]:
+    start_date: datetime = datetime(2024, 1, 1)
+    end_date: datetime = datetime(2024, 2, 1)  # flights for just one month
+    delta: timedelta = end_date - start_date
+    return [start_date + timedelta(days=i) for i in range(delta.days + 1)]
+
+
+def generate_dest_airport(
+    all_airports: list[Airport], orig_airport: Airport
+) -> tuple[Airport, float]:
+    dest_airport = random.choice(all_airports)
+    distance_km: float = geodesic(
+        (orig_airport.lat, orig_airport.lon),
+        (dest_airport.lat, dest_airport.lon),
+    ).km
+
+    return (dest_airport, distance_km)
+
+
+def build_single_flight(
+    plane, orig_airport: Airport, dest_airport: Airport, date: datetime, distance_km: float
+) -> Flight:
+    flight_id: str = generate_flight_id()
+    duration_hours: float = calculate_duration(distance_km, plane["speed"])
+    # the departure time is at a random time in the day
+    departure_time: datetime = date + timedelta(
+        hours=random.randint(0, 23), minutes=random.randint(0, 59)
+    )
+    arrival_time: datetime = departure_time + timedelta(hours=duration_hours)
+    price_business, price_economy = generate_prices(distance_km)
+
+    return Flight(
+        flight_id,
+        plane["model"],
+        price_business,
+        price_economy,
+        departure_time,
+        arrival_time,
+        orig_airport.id,
+        dest_airport.id,
+    )
 
 
 def generate_flights(cursor: MySQLCursor) -> list[Flight]:
-    airports = get_airports(cursor)
-    flights = []
+    all_airports: list[Airport] = get_airports(cursor)
+    dates = generate_all_dates()
+    flights: list[Flight] = []
 
     plane_models = [
         {"model": "Boeing 787-9", "speed": 903, "range": 14140},
         {"model": "Airbus A320neo", "speed": 833, "range": 6500},
     ]
 
-    dates = generate_dates_for_2024()
+    count = 0
+    do_i_print = 24  # prints every 25 airports finished
+    for curr_orig_airport in all_airports:
+        flights_per_day: int = 0
+        if curr_orig_airport.type == "large_airport":
+            flights_per_day = random.randint(5, 10)
+            long_haul_fligths = floor(flights_per_day * 0.5)
+        else:
+            flights_per_day = random.randint(1, 5)
+            long_haul_fligths = floor(flights_per_day * 0.2)
+        short_haul_fligths = flights_per_day - long_haul_fligths
 
-    for orig_airport in airports:
-        # the daily flight number is greater for large airports
-        num_flights_per_day = (
-            random.randint(5, 15) if orig_airport.type == "large_airport" else random.randint(1, 5)
-        )
-
+        flight_indexes = ([0] * long_haul_fligths) + ([1] * short_haul_fligths)
         for date in dates:
-            long_haul_flights_count = 0
-            short_haul_flights_count = 0
+            for plane_index in flight_indexes:
+                plane = plane_models[plane_index]
 
-            for _ in range(num_flights_per_day):
-                # Determine if this flight should be long-haul or short-haul
-                if orig_airport.type == "large_airport":
-                    use_long_haul = long_haul_flights_count < num_flights_per_day * 0.5
-                else:
-                    use_long_haul = long_haul_flights_count < num_flights_per_day * 0.2
-
-                plane = plane_models[0] if use_long_haul else plane_models[1]
-
-                # we keep searching for destination airports if the destination == origin, or if
-                # the distance to said airport is greater than the range provided by the current
-                # plane
-                dest_airport = random.choice(airports)
-                distance_km = geodesic(
-                    (orig_airport.lat, orig_airport.lon),
-                    (dest_airport.lat, dest_airport.lon),
-                ).km
-
-                while (dest_airport.id == orig_airport.id) and (distance_km > plane["range"]):
-                    dest_airport = random.choice(airports)
-                    distance_km = geodesic(
-                        (orig_airport.lat, orig_airport.lon),
-                        (dest_airport.lat, dest_airport.lon),
-                    ).km
-
-                flight_id = generate_flight_id()
-                duration_hours = calculate_duration(distance_km, plane["speed"])
-                # the departure time is at a random time in the day
-                departure_time = date + timedelta(
-                    hours=random.randint(0, 23), minutes=random.randint(0, 59)
+                dest_airport, distance_km = generate_dest_airport(
+                    all_airports,
+                    curr_orig_airport,
                 )
-                arrival_time = departure_time + timedelta(hours=duration_hours)
-                price_business, price_economy = generate_prices(distance_km)
+                while (dest_airport.id == curr_orig_airport.id) or (distance_km > plane["range"]):
+                    dest_airport, distance_km = generate_dest_airport(
+                        all_airports,
+                        curr_orig_airport,
+                    )
 
-                flight = Flight(
-                    flight_id,
-                    plane["model"],
-                    price_business,
-                    price_economy,
-                    departure_time,
-                    arrival_time,
-                    orig_airport.id,
-                    dest_airport.id,
+                flight = build_single_flight(
+                    plane, curr_orig_airport, dest_airport, date, distance_km
                 )
+
                 flights.append(flight)
 
-                # Update counts of each type of flight for the current airport
-                if use_long_haul:
-                    long_haul_flights_count += 1
-                else:
-                    short_haul_flights_count += 1
+        count += 1
+        do_i_print += 1
+        if do_i_print == 25:
+            # Actualizar el contador en la misma línea
+            sys.stdout.write(f"\rAeropuertos terminados de generar: {count}")
+            sys.stdout.flush()
+            do_i_print = 0
+    sys.stdout.write(f"\rAeropuertos terminados de generar: {count}\n")
+    sys.stdout.flush()
 
     return flights
 
@@ -181,7 +197,6 @@ def main():
     flights = generate_flights(cursor)
     cursor.close()
     db_connection.close()
-
     # Print some of the generated flights
     for flight in flights[:10]:  # Just printing first 10 for brevity
         print(vars(flight))

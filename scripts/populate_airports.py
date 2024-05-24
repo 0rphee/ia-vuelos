@@ -66,7 +66,7 @@ def main():
             next(csvreader)  # Saltar la cabecera
 
             count = 0
-            do_i_print = 24
+            do_i_print = 24  # prints every 25 airports finished
             for row in csvreader:
                 try:
                     # Ajustar la longitud de la fila a la cantidad de columnas esperadas
