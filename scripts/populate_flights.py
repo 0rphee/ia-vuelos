@@ -8,42 +8,12 @@ import mysql.connector
 from geopy.distance import geodesic
 from mysql.connector.cursor import MySQLCursor
 
+from ia_vuelos.data import Airport, Flight
+
 """
 Rows in 'airports' table, in 'fly_data'
 "id","ident","type","name","latitude_deg","longitude_deg","elevation_ft","continent","iso_country","iso_region","municipality","scheduled_service","gps_code","iata_code","local_code","home_link","wikipedia_link","keywords"
 """
-
-
-class Airport:
-    def __init__(self, row: tuple[int, str, str, str, float, float]) -> None:
-        self.id: int = int(row[0])
-        self.ident: str = str(row[1])
-        self.type: str = str(row[2])
-        self.name: str = str(row[3])
-        self.lat: float = float(row[4])
-        self.lon: float = float(row[5])
-
-
-class Flight:
-    def __init__(
-        self,
-        flight_id: str,
-        model: str,
-        price_business: float,
-        price_economy: float,
-        departure_time: datetime,
-        arrival_time: datetime,
-        departure_airport_id: int,
-        arrival_airport_id: int,
-    ) -> None:
-        self.flight_id: str = flight_id
-        self.model: str = model
-        self.price_business: float = price_business
-        self.price_economy: float = price_economy
-        self.departure_time: datetime = departure_time
-        self.arrival_time: datetime = arrival_time
-        self.departure_airport_id: int = departure_airport_id
-        self.arrival_airport_id: int = arrival_airport_id
 
 
 def get_airports(cursor: MySQLCursor) -> list[Airport]:
@@ -186,10 +156,16 @@ def generate_flights(cursor: MySQLCursor):
         flight_indexes = [0 for _ in range(long_haul_flights)] + [
             1 for _ in range(short_haul_flights)
         ]
+        # print(
+        #     f"\ntotal flights {flights_per_day} long: {long_haul_fligths} short: {short_haul_fligths} \n"
+        # )
+        # sleep(1)
         for date in dates:
             for plane_index in flight_indexes:
                 plane = plane_models[plane_index]
 
+                # if plane["model"] != "Airbus A320neo":
+                #     print(plane)
 
                 while True:
                     flight = build_single_flight(plane, all_airports, curr_orig_airport, date)

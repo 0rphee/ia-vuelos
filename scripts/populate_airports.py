@@ -1,6 +1,9 @@
 import csv
-import mysql.connector
 import sys
+
+import mysql.connector
+
+from ia_vuelos.data import Airport, Flight
 
 # Crear la tabla si no existe
 create_table_query = """
