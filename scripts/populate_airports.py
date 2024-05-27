@@ -9,7 +9,7 @@ from ia_vuelos.data import Airport, Flight
 create_table_query = """
 CREATE TABLE IF NOT EXISTS airports (
     id INT PRIMARY KEY,
-    ident VARCHAR(10),
+    ident VARCHAR(10) UNIQUE,
     type VARCHAR(50),
     name VARCHAR(100),
     latitude_deg DOUBLE,
