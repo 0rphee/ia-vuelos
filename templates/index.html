@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Flight Planner</title>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="{{ url_for('static', filename='styles.css') }}"
+    />
+  </head>
+  <body>
+    <h1>Select Your Flight</h1>
+    <form method="POST">
+      <label for="departure_airport">Departure Airport:</label>
+      <select name="departure_airport" id="departure_airport">
+        {% for airport in airports %}
+        <option value="{{ airport.id }}">{{ airport.name }}</option>
+        {% endfor %}</select
+      ><br />
+
+      <label for="arrival_airport">Arrival Airport:</label>
+      <select name="arrival_airport" id="arrival_airport">
+        {% for airport in airports %}
+        <option value="{{ airport.id }}">{{ airport.name }}</option>
+        {% endfor %}</select
+      ><br />
+
+      <label for="date">Departure Date:</label>
+      <input type="date" id="date" name="date" required /><br />
+
+      <input type="submit" value="Find Flights" />
+    </form>
+  </body>
+</html>

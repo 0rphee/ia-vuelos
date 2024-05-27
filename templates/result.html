@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Flight Results</title>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="{{ url_for('static', filename='styles.css') }}"
+    />
+  </head>
+  <body>
+    <h1>Flight Path</h1>
+    <ul>
+      {% for airport, flight in path %}
+      <li>
+        {{ airport.name }} -> {{ flight.flight_id }} ({{ flight.departure_time
+        }} to {{ flight.arrival_time }})
+      </li>
+      {% endfor %}
+    </ul>
+    <h2>Final Destination: {{ final_airport.name }}</h2>
+    <a href="{{ url_for('index') }}">Search Again</a>
+  </body>
+</html>

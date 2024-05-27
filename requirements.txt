@@ -1,3 +1,5 @@
 geopy==2.4.1
 mysql-connector-python==8.4.0
 sqlalchemy==2.0.30
+flask==3.0.3
+flask-caching==2.1.0
