@@ -82,15 +82,15 @@ class Airport(Base):
     __tablename__ = "airports"
 
     id = Column(Integer, primary_key=True)
-    ident = Column(String(10))
+    ident = Column(String(10), unique=True)
     type = Column(String(50))
     name = Column(String(100))
     latitude_deg = Column(Double)
     longitude_deg = Column(Double)
     elevation_ft = Column(Integer)
     continent = Column(String(2))
-    iso_country = Column(String(2))
-    iso_region = Column(String(10))
+    iso_country = Column(String(2), ForeignKey("countries.code"))
+    iso_region = Column(String(10), ForeignKey("regions.code"))
     municipality = Column(String(100))
     scheduled_service = Column(Boolean)
     gps_code = Column(String(10))
@@ -106,6 +106,9 @@ class Airport(Base):
     arrivals = relationship(
         "Flight", foreign_keys="Flight.arrival_airport_id", back_populates="arrival_airport"
     )
+
+    country = relationship("Country", back_populates="airports")
+    region = relationship("Region", back_populates="airports")
 
     def __init__(
         self,
@@ -202,4 +205,68 @@ Airport:
                 (self.latitude_deg, self.longitude_deg),
                 (airport2.latitude_deg, airport2.longitude_deg),
             ).km
+        )
+
+
+class Country(Base):
+    __tablename__ = "countries"
+
+    id = Column(Integer, primary_key=True)
+    code = Column(String(2), unique=True, nullable=False)
+    name = Column(String(100), nullable=False)
+    continent = Column(String(2), nullable=False)
+    wikipedia_link = Column(Text)
+    keywords = Column(Text)
+
+    regions = relationship("Region", back_populates="country")
+    airports = relationship("Airport", back_populates="country")
+
+    def __init__(
+        self, id: int, code: str, name: str, continent: str, wikipedia_link: str, keywords: str
+    ):
+        super().__init__(
+            id=id,
+            code=code,
+            name=name,
+            continent=continent,
+            wikipedia_link=wikipedia_link,
+            keywords=keywords,
+        )
+
+
+class Region(Base):
+    __tablename__ = "regions"
+
+    id = Column(Integer, primary_key=True)
+    code = Column(String(10), unique=True, nullable=False)
+    local_code = Column(String(10), nullable=False)
+    name = Column(String(100), nullable=False)
+    continent = Column(String(2), nullable=False)
+    iso_country = Column(String(2), ForeignKey("countries.code"), nullable=False)
+    wikipedia_link = Column(Text)
+    keywords = Column(Text)
+
+    country = relationship("Country", back_populates="regions")
+    airports = relationship("Airport", back_populates="region")
+
+    def __init__(
+        self,
+        id: int,
+        code: str,
+        local_code: str,
+        name: str,
+        continent: str,
+        iso_country: str,
+        wikipedia_link: str,
+        keywords: str,
+    ):
+        super().__init__(
+            id=id,
+            code=code,
+            local_code=local_code,
+            name=name,
+            continent=continent,
+            iso_country=iso_country,
+            wikipedia_link=wikipedia_link,
+            keywords=keywords,
         )

@@ -8,13 +8,11 @@ import sqlalchemy_utils
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from ia_vuelos.sqlalchemy import Airport, Base
+from ia_vuelos.sqlalchemy import Base, Country
 
 
 def convert_row(row):
-    # Convertir "yes" a True y "no" a False para scheduled_service
-    row[11] = True if row[11] == "yes" else False if row[11] == "no" else None
-    # Convertir cadenas vacías a None
+    # Convert empty strings to None
     return [None if field == "" else field for field in row]
 
 
@@ -28,62 +26,51 @@ def main():
 
     if not sqlalchemy_utils.database_exists(engine.url):
         sqlalchemy_utils.create_database(engine.url)
+
     with Session() as session:
 
         # Create the tables if they don't exist
         Base.metadata.create_all(engine)
         print("Conexión lograda con mysql")
 
-        # Leer el archivo CSV en modo streaming
-        with open("data/airports.csv", "r") as csvfile:
+        # Read the CSV file
+        with open("data/countries.csv", "r") as csvfile:
             csvreader = csv.reader(csvfile)
-            next(csvreader)  # Saltar la cabecera
+            next(csvreader)  # Skip the header
 
             count = 0
-            do_i_print = 24  # prints every 25 airports finished
+            do_i_print = 24  # prints every 25 rows finished
             for row in csvreader:
                 try:
-                    # Ajustar la longitud de la fila a la cantidad de columnas esperadas
-                    if len(row) < 18:
-                        row += [None] * (18 - len(row))
-                    # Convertir y limpiar la fila
+                    # Adjust the length of the row to the number of columns expected
+                    if len(row) < 6:
+                        row += [None] * (6 - len(row))
+                    # Convert and clean the row
                     cleaned_row = convert_row(row)
 
-                    # Create an Airport object
-                    airport = Airport(
+                    # Create a Country object
+                    country = Country(
                         cleaned_row[0],
                         cleaned_row[1],
                         cleaned_row[2],
                         cleaned_row[3],
                         cleaned_row[4],
                         cleaned_row[5],
-                        cleaned_row[6],
-                        cleaned_row[7],
-                        cleaned_row[8],
-                        cleaned_row[9],
-                        cleaned_row[10],
-                        cleaned_row[11],
-                        cleaned_row[12],
-                        cleaned_row[13],
-                        cleaned_row[14],
-                        cleaned_row[15],
-                        cleaned_row[16],
-                        cleaned_row[17],
                     )
 
-                    # Add the Airport object to the session
-                    session.add(airport)
+                    # Add the Country object to the session
+                    session.add(country)
                     session.commit()
                     count += 1
                     do_i_print += 1
                     if do_i_print == 25:
-                        # Actualizar el contador en la misma línea
+                        # Update the counter on the same line
                         sys.stdout.write(f"\rFilas insertadas: {count}")
                         sys.stdout.flush()
                         do_i_print = 0
                 except Exception as e:
                     session.rollback()
-                    print(f"\nEXITING\nError row:\n{row}\nEXITING")
+                    print(f"\nEXITING\nError {e} row:\n{row}\nEXITING")
                     raise e
 
             sys.stdout.write(f"\rFilas insertadas: {count}")

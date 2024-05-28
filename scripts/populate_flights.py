@@ -3,12 +3,16 @@ import string
 import sys
 from datetime import datetime, timedelta
 from math import floor
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import mysql.connector
 from geopy.distance import geodesic
 from mysql.connector.cursor import MySQLCursor
 
 from ia_vuelos.data import Airport, Flight
+
 
 """
 Rows in 'airports' table, in 'fly_data'
@@ -176,7 +180,7 @@ def generate_flights(cursor: MySQLCursor):
                         print("\n\nIntegrityError: Probably duplicate key:", e)
                         print(f"\nIn Error Flight:\n{vars(flight)}\n")
                     except Exception as e:
-                        print(f"\nEXITING\nError Flight:\n{vars(flight)}\nEXITING")
+                        print(f"\nEXITING\nError {e} Flight:\n{vars(flight)}\nEXITING")
                         raise e
 
         count += 1
