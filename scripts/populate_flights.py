@@ -220,6 +220,7 @@ def main():
         password="root",
         database="fly_data",
     )
+    print("Conexión lograda con mysql: insertando vuelos")
 
     cursor: MySQLCursor = db_connection.cursor()
     create_flights_table(cursor)

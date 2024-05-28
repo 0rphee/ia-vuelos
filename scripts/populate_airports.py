@@ -32,7 +32,7 @@ def main():
 
         # Create the tables if they don't exist
         Base.metadata.create_all(engine)
-        print("Conexión lograda con mysql")
+        print("Conexión lograda con mysql: insertando aeropuertos")
 
         # Leer el archivo CSV en modo streaming
         with open("data/airports.csv", "r") as csvfile:

@@ -30,7 +30,7 @@ def main():
 
         # Create the tables if they don't exist
         Base.metadata.create_all(engine)
-        print("Conexión lograda con mysql")
+        print("Conexión lograda con mysql: insertando regiones")
 
         # Read the CSV file
         with open("data/regions.csv", "r") as csvfile:
