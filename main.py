@@ -59,13 +59,21 @@ def get_continents():
     return jsonify([str(continent[0]) for continent in continents])
 
 
-@app.route("/get_countries", methods=["POST"])
+@app.route("/get_countries", methods=["GET"])
 @cross_origin()
 def get_countries():
-    continent = request.json["continent"]
+    # Extract the continent from the query parameters
+    continent = request.args.get("continent")
+
+    if not continent:
+        return jsonify({"error": "Continent parameter is required"}), 400
+
+    # Query the database for countries in the specified continent
     with SessionLocal() as session:
         countries = session.query(Country).filter_by(continent=continent).all()
-    return jsonify([country.name for country in countries])
+
+    # Return the list of country names as a JSON response
+    return jsonify([{"id": country.id, "name": country.name} for country in countries])
 
 
 @app.route("/get_airports", methods=["POST"])
