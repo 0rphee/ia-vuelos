@@ -31,42 +31,62 @@ main =
 
 type alias Model =
     { continents : Maybe (Array Continent)
-    , originAirport : AirportInfo
-    , destinationAirport : AirportInfo
+    , originAirport : FinalNodesInfo
+    , destinationAirport : FinalNodesInfo
     , date : Maybe String
     }
 
 
-type alias AirportInfo =
-    { continent : Maybe Continent
-    , country : Maybe Country
-    , countryOptions : Maybe (Dict Int Country) -- Int: id, String: name
+type alias FinalNodesInfo =
+    { selectedContinent : Maybe Continent
+    , selectedCountry : Maybe Country
+    , countryOptions : Maybe (Dict String Country) -- Int: id, String: name
+    , airportOptions : Maybe (Dict Int Airport)
+    , selectedAirport : Maybe Airport
     }
 
 
-setOriginAirport : AirportInfo -> Model -> Model
-setOriginAirport airportInfo model =
+type Airport
+    = Airport
+        { id : Int
+        , ident : String
+        , name : String
+        }
+
+
+setOriginNode : FinalNodesInfo -> Model -> Model
+setOriginNode airportInfo model =
     { model | originAirport = airportInfo }
 
 
-setDestinationAirport : AirportInfo -> Model -> Model
-setDestinationAirport airportInfo model =
+setDestinationNode : FinalNodesInfo -> Model -> Model
+setDestinationNode airportInfo model =
     { model | destinationAirport = airportInfo }
 
 
-setAirportContinent : Maybe Continent -> AirportInfo -> AirportInfo
-setAirportContinent continent airportInfo =
-    { airportInfo | continent = continent }
+setNodeContinent : Maybe Continent -> FinalNodesInfo -> FinalNodesInfo
+setNodeContinent continent airportInfo =
+    { airportInfo | selectedContinent = continent }
 
 
-setAirportCountry : Maybe Country -> AirportInfo -> AirportInfo
-setAirportCountry country airportInfo =
-    { airportInfo | country = country }
+setNodeCountry : Maybe Country -> FinalNodesInfo -> FinalNodesInfo
+setNodeCountry country airportInfo =
+    { airportInfo | selectedCountry = country }
 
 
-setAirportCountryOptions : Maybe (Dict Int Country) -> AirportInfo -> AirportInfo
-setAirportCountryOptions countryOptions airportInfo =
+setNodeCountryOptions : Maybe (Dict String Country) -> FinalNodesInfo -> FinalNodesInfo
+setNodeCountryOptions countryOptions airportInfo =
     { airportInfo | countryOptions = countryOptions }
+
+
+setNodeAirport : Maybe Airport -> FinalNodesInfo -> FinalNodesInfo
+setNodeAirport country airportInfo =
+    { airportInfo | selectedAirport = country }
+
+
+setNodeAirportOptions : Maybe (Dict Int Airport) -> FinalNodesInfo -> FinalNodesInfo
+setNodeAirportOptions airportOptions airportInfo =
+    { airportInfo | airportOptions = airportOptions }
 
 
 type Continent
@@ -79,7 +99,7 @@ continentToString (Continent s) =
 
 
 type Country
-    = Country { id : Int, name : String }
+    = Country { code : String, name : String }
 
 
 countryToString : Country -> String
@@ -87,12 +107,28 @@ countryToString (Country c) =
     c.name
 
 
-countryDecoder : Decoder (Dict Int Country)
+airportToString : Airport -> String
+airportToString (Airport c) =
+    c.name
+
+
+countryDecoder : Decoder (Dict String Country)
 countryDecoder =
     Json.map (\list -> Dict.fromList list)
         (Json.list <|
-            Json.map2 (\id name -> ( id, Country { id = id, name = name } ))
+            Json.map2 (\code name -> ( code, Country { code = code, name = name } ))
+                (Json.field "code" Json.string)
+                (Json.field "name" Json.string)
+        )
+
+
+airportDecoder : Decoder (Dict Int Airport)
+airportDecoder =
+    Json.map (\list -> Dict.fromList list)
+        (Json.list <|
+            Json.map3 (\id ident name -> ( id, Airport { id = id, ident = ident, name = name } ))
                 (Json.field "id" Json.int)
+                (Json.field "ident" Json.string)
                 (Json.field "name" Json.string)
         )
 
@@ -100,8 +136,9 @@ countryDecoder =
 init : () -> ( Model, Cmd Msg )
 init _ =
     let
+        emptyAirportInfo : FinalNodesInfo
         emptyAirportInfo =
-            { continent = Nothing, country = Nothing, countryOptions = Nothing }
+            { selectedContinent = Nothing, selectedCountry = Nothing, countryOptions = Nothing, airportOptions = Nothing, selectedAirport = Nothing }
     in
     ( { continents = Nothing, originAirport = emptyAirportInfo, destinationAirport = emptyAirportInfo, date = Nothing }
     , Http.get
@@ -123,8 +160,10 @@ type WhichAirportChange
 type Msg
     = GotContinents (Result Http.Error (Array Continent))
     | UpdateContinent WhichAirportChange String
-    | GotCountries WhichAirportChange (Result Http.Error (Dict Int Country))
-    | UpdateCountry WhichAirportChange Int -- country id
+    | GotCountries WhichAirportChange (Result Http.Error (Dict String Country))
+    | UpdateCountry WhichAirportChange String -- country iso_code
+    | GotAirports WhichAirportChange (Result Http.Error (Dict Int Airport))
+    | UpdateAirport WhichAirportChange Int -- airport id id
 
 
 continentDecoder : Decoder (Array Continent)
@@ -134,56 +173,75 @@ continentDecoder =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
+    let
+        toMaybeWithLog : Result a b -> Maybe b
+        toMaybeWithLog res =
+            Result.toMaybe <| Result.mapError (Debug.log "Request error") res
+    in
     case msg of
         GotContinents res ->
-            case res of
-                Ok contArray ->
-                    ( { model | continents = Just contArray }, Cmd.none )
-
-                Err _ ->
-                    ( model, Cmd.none )
+            ( { model | continents = toMaybeWithLog res }
+            , Cmd.none
+            )
 
         GotCountries originOrDestinationChange countryDictRes ->
             let
-                updateAirportInfo : AirportInfo -> AirportInfo
-                updateAirportInfo airport =
+                updateNodeInfo : FinalNodesInfo -> FinalNodesInfo
+                updateNodeInfo node =
                     let
-                        countryOptions : Maybe (Dict Int Country)
+                        countryOptions : Maybe (Dict String Country)
                         countryOptions =
-                            case countryDictRes of
-                                Ok countries ->
-                                    Just countries
-
-                                Err e ->
-                                    Nothing
+                            toMaybeWithLog countryDictRes
                     in
-                    setAirportCountryOptions countryOptions airport
+                    setNodeCountryOptions countryOptions node
 
                 finalModel : Model
                 finalModel =
                     case originOrDestinationChange of
                         OriginChange ->
-                            setOriginAirport (updateAirportInfo model.originAirport) model
+                            setOriginNode (updateNodeInfo model.originAirport) model
 
                         DestinationChange ->
-                            setDestinationAirport (updateAirportInfo model.destinationAirport) model
+                            setDestinationNode (updateNodeInfo model.destinationAirport) model
+            in
+            ( finalModel, Cmd.none )
+
+        GotAirports originOrDestinationChange airportDictRes ->
+            let
+                updateNodeInfo : FinalNodesInfo -> FinalNodesInfo
+                updateNodeInfo node =
+                    let
+                        airportOptions : Maybe (Dict Int Airport)
+                        airportOptions =
+                            toMaybeWithLog airportDictRes
+                    in
+                    setNodeAirportOptions airportOptions node
+
+                finalModel : Model
+                finalModel =
+                    case originOrDestinationChange of
+                        OriginChange ->
+                            setOriginNode (updateNodeInfo model.originAirport) model
+
+                        DestinationChange ->
+                            setDestinationNode (updateNodeInfo model.destinationAirport) model
             in
             ( finalModel, Cmd.none )
 
         UpdateContinent originOrDestinationChange selectedContinent ->
             let
-                updateAirportInfo : AirportInfo -> AirportInfo
-                updateAirportInfo airport =
-                    setAirportContinent (Just (Continent selectedContinent)) airport
+                updateNodeInfo : FinalNodesInfo -> FinalNodesInfo
+                updateNodeInfo airport =
+                    setNodeContinent (Just (Continent selectedContinent)) airport
 
                 finalModel : Model
                 finalModel =
                     case originOrDestinationChange of
                         OriginChange ->
-                            setOriginAirport (updateAirportInfo model.originAirport) model
+                            setOriginNode (updateNodeInfo model.originAirport) model
 
                         DestinationChange ->
-                            setDestinationAirport (updateAirportInfo model.destinationAirport) model
+                            setDestinationNode (updateNodeInfo model.destinationAirport) model
             in
             ( finalModel
             , Http.get
@@ -192,19 +250,18 @@ update msg model =
                 }
             )
 
-        UpdateCountry originOrDestinationChange selectedCountryId ->
+        UpdateCountry originOrDestinationChange selectedCountryIsoCode ->
             let
-                updateAirportInfo : AirportInfo -> AirportInfo
-                updateAirportInfo airport =
-                    -- setAirportContinent (Just (Continent selectedContinent)) airport
+                updateNodeInfo : FinalNodesInfo -> FinalNodesInfo
+                updateNodeInfo airport =
                     case airport.countryOptions of
                         Just countriesAvailable ->
                             let
                                 country : Maybe Country
                                 country =
-                                    Dict.get selectedCountryId countriesAvailable
+                                    Dict.get selectedCountryIsoCode countriesAvailable
                             in
-                            setAirportCountry country airport
+                            setNodeCountry country airport
 
                         Nothing ->
                             Debug.log "impossible"
@@ -214,10 +271,43 @@ update msg model =
                 finalModel =
                     case originOrDestinationChange of
                         OriginChange ->
-                            setOriginAirport (updateAirportInfo model.originAirport) model
+                            setOriginNode (updateNodeInfo model.originAirport) model
 
                         DestinationChange ->
-                            setDestinationAirport (updateAirportInfo model.destinationAirport) model
+                            setDestinationNode (updateNodeInfo model.destinationAirport) model
+            in
+            ( finalModel
+            , Http.get
+                { url = "http://localhost:5000/get_airports?iso_country=" ++ selectedCountryIsoCode
+                , expect = Http.expectJson (GotAirports originOrDestinationChange) airportDecoder
+                }
+            )
+
+        UpdateAirport originOrDestinationChange selectedAirportId ->
+            let
+                updateNodeInfo : FinalNodesInfo -> FinalNodesInfo
+                updateNodeInfo node =
+                    case node.airportOptions of
+                        Just countriesAvailable ->
+                            let
+                                airport : Maybe Airport
+                                airport =
+                                    Dict.get selectedAirportId countriesAvailable
+                            in
+                            setNodeAirport airport node
+
+                        Nothing ->
+                            Debug.log "impossible"
+                                node
+
+                finalModel : Model
+                finalModel =
+                    case originOrDestinationChange of
+                        OriginChange ->
+                            setOriginNode (updateNodeInfo model.originAirport) model
+
+                        DestinationChange ->
+                            setDestinationNode (updateNodeInfo model.destinationAirport) model
             in
             ( finalModel, Cmd.none )
 
@@ -240,8 +330,16 @@ view model =
     let
         debugModel =
             Debug.log "model " model
-    in
-    let
+
+        toInt : String -> Int
+        toInt s =
+            case String.toInt s of
+                Just v ->
+                    v
+
+                Nothing ->
+                    todo "toInt failure"
+
         continentSelector : Array Continent -> (String -> Msg) -> Html Msg
         continentSelector continents msgConstructor =
             select [ onInput msgConstructor ]
@@ -249,39 +347,37 @@ view model =
                     :: List.map (\cont -> option [ value (continentToString cont) ] [ text (continentToString cont) ]) (Array.toList continents)
                 )
 
-        countrySelector : Dict Int Country -> (Int -> Msg) -> Html Msg
+        countrySelector : Dict String Country -> (String -> Msg) -> Html Msg
         countrySelector countries msgConstructor =
-            let
-                toInt s =
-                    case String.toInt s of
-                        Just v ->
-                            v
-
-                        Nothing ->
-                            todo "toInt failure"
-            in
-            select [ onInput (\s -> msgConstructor (toInt s)) ]
+            select [ onInput msgConstructor ]
                 (option [ value "" ] [ text "Select a country" ]
-                    :: List.map (\( id, cont ) -> option [ value (String.fromInt id) ] [ text (countryToString cont) ]) (Dict.toList countries)
+                    :: List.map (\( isoCode, cont ) -> option [ value isoCode ] [ text (countryToString cont) ]) (Dict.toList countries)
                 )
 
-        maybeContinentToString : Maybe Continent -> String
-        maybeContinentToString maybeCont =
-            case maybeCont of
-                Just cont ->
-                    continentToString cont
+        airportSelector : Dict Int Airport -> (Int -> Msg) -> Html Msg
+        airportSelector airports msgConstructor =
+            select [ onInput (\s -> msgConstructor (toInt s)) ]
+                (option [ value "" ] [ text "Select an airport" ]
+                    :: List.map (\( id, cont ) -> option [ value (String.fromInt id) ] [ text (airportToString cont) ]) (Dict.toList airports)
+                )
 
-                Nothing ->
-                    "None"
-
-        airportOptionsHtml : Array Continent -> String -> (String -> Msg) -> (Int -> Msg) -> AirportInfo -> Html Msg
-        airportOptionsHtml contArray nameStr continentUpdateMsg countryUpdateMsg airportInfo =
+        nodeOptionsHtml : Array Continent -> String -> (String -> Msg) -> (String -> Msg) -> (Int -> Msg) -> FinalNodesInfo -> Html Msg
+        nodeOptionsHtml contArray nameStr continentUpdateMsg countryUpdateMsg airportUpdateMsg airportInfo =
             let
                 countriesHtml : List (Html Msg)
                 countriesHtml =
                     case airportInfo.countryOptions of
-                        Just c ->
-                            [ div [] [ text "Country: ", countrySelector c countryUpdateMsg ] ]
+                        Just countries ->
+                            [ div [] [ text "Country: ", countrySelector countries countryUpdateMsg ] ]
+
+                        Nothing ->
+                            []
+
+                airportsHtml : List (Html Msg)
+                airportsHtml =
+                    case airportInfo.airportOptions of
+                        Just airports ->
+                            [ div [] [ text "Airport: ", airportSelector airports airportUpdateMsg ] ]
 
                         Nothing ->
                             []
@@ -290,9 +386,9 @@ view model =
                 divChildren =
                     [ h1 [] [ text (nameStr ++ " Airport") ]
                     , div [] [ text (nameStr ++ " Continent: "), continentSelector contArray continentUpdateMsg ]
-                    , pre [] [ text "Selected Continent: ", text (maybeContinentToString airportInfo.continent) ]
                     ]
                         ++ countriesHtml
+                        ++ airportsHtml
             in
             div [] divChildren
 
@@ -301,8 +397,8 @@ view model =
             case model.continents of
                 Just contArray ->
                     div []
-                        [ airportOptionsHtml contArray "Origin" (UpdateContinent OriginChange) (UpdateCountry OriginChange) model.originAirport
-                        , airportOptionsHtml contArray "Destination" (UpdateContinent DestinationChange) (UpdateCountry DestinationChange) model.destinationAirport
+                        [ nodeOptionsHtml contArray "Origin" (UpdateContinent OriginChange) (UpdateCountry OriginChange) (UpdateAirport OriginChange) model.originAirport
+                        , nodeOptionsHtml contArray "Destination" (UpdateContinent DestinationChange) (UpdateCountry DestinationChange) (UpdateAirport DestinationChange) model.destinationAirport
                         ]
 
                 Nothing ->

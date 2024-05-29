@@ -66,23 +66,40 @@ def get_countries():
     continent = request.args.get("continent")
 
     if not continent:
-        return jsonify({"error": "Continent parameter is required"}), 400
+        return jsonify({"error": "'continent' parameter is required"}), 400
 
     # Query the database for countries in the specified continent
     with SessionLocal() as session:
         countries = session.query(Country).filter_by(continent=continent).all()
 
     # Return the list of country names as a JSON response
-    return jsonify([{"id": country.id, "name": country.name} for country in countries])
+    return jsonify([{"code": country.code, "name": country.name} for country in countries])
 
 
-@app.route("/get_airports", methods=["POST"])
+@app.route("/get_airports", methods=["GET"])
 @cross_origin()
 def get_airports():
-    country = request.json["country"]
+    # Extract the continent from the query parameters
+    country = request.args.get("iso_country")
+
+    if not country:
+        return jsonify({"error": "'iso_country' parameter is required"}), 400
+
+    # Query the database for airports in the specified country
     with SessionLocal() as session:
-        airports = session.query(Airport).filter_by(iso_country=country).all()
-    return jsonify([{"id": airport.id, "name": airport.name} for airport in airports])
+        airports = (
+            session.query(Airport)
+            .where(
+                Airport.type.in_(("large_airport", "medium_airport"))
+                & (Airport.iso_country == country)
+            )
+            .all()
+        )
+
+    # Return the list of country names as a JSON response
+    return jsonify(
+        [{"id": airport.id, "ident": airport.ident, "name": airport.name} for airport in airports]
+    )
 
 
 def main():
