@@ -108,6 +108,16 @@ setNodeAirportOptions airportOptions airportInfo =
     { airportInfo | airportOptions = airportOptions }
 
 
+getNodeCountryOptions : FinalNodesInfo -> Maybe (Dict String Country)
+getNodeCountryOptions node =
+    node.countryOptions
+
+
+getNodeAirportOptions : FinalNodesInfo -> Maybe (Dict Int Airport)
+getNodeAirportOptions node =
+    node.airportOptions
+
+
 countryToString : Country -> String
 countryToString (Country c) =
     c.name
@@ -115,7 +125,7 @@ countryToString (Country c) =
 
 airportToString : Airport -> String
 airportToString (Airport c) =
-    c.name
+    "(" ++ c.ident ++ ") " ++ c.name
 
 
 countryDecoder : Decoder (Dict String Country)
@@ -171,72 +181,47 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
-        toMaybeWithLog : Result a b -> Maybe b
-        toMaybeWithLog res =
+        resToMaybeWithLog : Result a b -> Maybe b
+        resToMaybeWithLog res =
             Result.toMaybe <| Result.mapError (Debug.log "Request error") res
+
+        gotFinalModel : (Maybe good -> FinalNodesInfo -> FinalNodesInfo) -> WhichAirportChange -> Result e good -> Model
+        gotFinalModel setter originOrDestinationChange dictRes =
+            case originOrDestinationChange of
+                OriginChange ->
+                    setOriginNode (setter (resToMaybeWithLog dictRes) model.originAirport) model
+
+                DestinationChange ->
+                    setDestinationNode (setter (resToMaybeWithLog dictRes) model.destinationAirport) model
+
+        updateFinalModel : WhichAirportChange -> comparable -> (Maybe v -> FinalNodesInfo -> FinalNodesInfo) -> (FinalNodesInfo -> Maybe (Dict comparable v)) -> Model
+        updateFinalModel originOrDestinationChange selectedValue setter dictGetter =
+            let
+                updateNodeInfo : FinalNodesInfo -> FinalNodesInfo
+                updateNodeInfo node =
+                    let
+                        valueToSet : Maybe v
+                        valueToSet =
+                            Maybe.andThen (\dict -> Dict.get selectedValue dict) (dictGetter node)
+                    in
+                    setter valueToSet node
+            in
+            case originOrDestinationChange of
+                OriginChange ->
+                    setOriginNode (updateNodeInfo model.originAirport) model
+
+                DestinationChange ->
+                    setDestinationNode (updateNodeInfo model.destinationAirport) model
     in
     case msg of
         GotCountries originOrDestinationChange countryDictRes ->
-            let
-                updateNodeInfo : FinalNodesInfo -> FinalNodesInfo
-                updateNodeInfo node =
-                    let
-                        countryOptions : Maybe (Dict String Country)
-                        countryOptions =
-                            toMaybeWithLog countryDictRes
-                    in
-                    setNodeCountryOptions countryOptions node
-
-                finalModel : Model
-                finalModel =
-                    case originOrDestinationChange of
-                        OriginChange ->
-                            setOriginNode (updateNodeInfo model.originAirport) model
-
-                        DestinationChange ->
-                            setDestinationNode (updateNodeInfo model.destinationAirport) model
-            in
-            ( finalModel, Cmd.none )
+            ( gotFinalModel setNodeCountryOptions originOrDestinationChange countryDictRes, Cmd.none )
 
         GotAirports originOrDestinationChange airportDictRes ->
-            let
-                updateNodeInfo : FinalNodesInfo -> FinalNodesInfo
-                updateNodeInfo node =
-                    let
-                        airportOptions : Maybe (Dict Int Airport)
-                        airportOptions =
-                            toMaybeWithLog airportDictRes
-                    in
-                    setNodeAirportOptions airportOptions node
-
-                finalModel : Model
-                finalModel =
-                    case originOrDestinationChange of
-                        OriginChange ->
-                            setOriginNode (updateNodeInfo model.originAirport) model
-
-                        DestinationChange ->
-                            setDestinationNode (updateNodeInfo model.destinationAirport) model
-            in
-            ( finalModel, Cmd.none )
+            ( gotFinalModel setNodeAirportOptions originOrDestinationChange airportDictRes, Cmd.none )
 
         UpdateContinent originOrDestinationChange selectedContinentCode ->
-            let
-                updateNodeInfo : FinalNodesInfo -> FinalNodesInfo
-                updateNodeInfo airport =
-                    setNodeContinent (Dict.get selectedContinentCode continentDictionary) airport
-
-                -- (Just (Continent selectedContinentCode)) airport
-                finalModel : Model
-                finalModel =
-                    case originOrDestinationChange of
-                        OriginChange ->
-                            setOriginNode (updateNodeInfo model.originAirport) model
-
-                        DestinationChange ->
-                            setDestinationNode (updateNodeInfo model.destinationAirport) model
-            in
-            ( finalModel
+            ( updateFinalModel originOrDestinationChange selectedContinentCode setNodeContinent (\_ -> Just continentDictionary)
             , Http.get
                 { url = "http://localhost:5000/get_countries?continent=" ++ selectedContinentCode
                 , expect = Http.expectJson (GotCountries originOrDestinationChange) countryDecoder
@@ -244,32 +229,7 @@ update msg model =
             )
 
         UpdateCountry originOrDestinationChange selectedCountryIsoCode ->
-            let
-                updateNodeInfo : FinalNodesInfo -> FinalNodesInfo
-                updateNodeInfo airport =
-                    case airport.countryOptions of
-                        Just countriesAvailable ->
-                            let
-                                country : Maybe Country
-                                country =
-                                    Dict.get selectedCountryIsoCode countriesAvailable
-                            in
-                            setNodeCountry country airport
-
-                        Nothing ->
-                            Debug.log "impossible"
-                                airport
-
-                finalModel : Model
-                finalModel =
-                    case originOrDestinationChange of
-                        OriginChange ->
-                            setOriginNode (updateNodeInfo model.originAirport) model
-
-                        DestinationChange ->
-                            setDestinationNode (updateNodeInfo model.destinationAirport) model
-            in
-            ( finalModel
+            ( updateFinalModel originOrDestinationChange selectedCountryIsoCode setNodeCountry getNodeCountryOptions
             , Http.get
                 { url = "http://localhost:5000/get_airports?iso_country=" ++ selectedCountryIsoCode
                 , expect = Http.expectJson (GotAirports originOrDestinationChange) airportDecoder
@@ -277,32 +237,9 @@ update msg model =
             )
 
         UpdateAirport originOrDestinationChange selectedAirportId ->
-            let
-                updateNodeInfo : FinalNodesInfo -> FinalNodesInfo
-                updateNodeInfo node =
-                    case node.airportOptions of
-                        Just countriesAvailable ->
-                            let
-                                airport : Maybe Airport
-                                airport =
-                                    Dict.get selectedAirportId countriesAvailable
-                            in
-                            setNodeAirport airport node
-
-                        Nothing ->
-                            Debug.log "impossible"
-                                node
-
-                finalModel : Model
-                finalModel =
-                    case originOrDestinationChange of
-                        OriginChange ->
-                            setOriginNode (updateNodeInfo model.originAirport) model
-
-                        DestinationChange ->
-                            setDestinationNode (updateNodeInfo model.destinationAirport) model
-            in
-            ( finalModel, Cmd.none )
+            ( updateFinalModel originOrDestinationChange selectedAirportId setNodeAirport getNodeAirportOptions
+            , Cmd.none
+            )
 
 
 
