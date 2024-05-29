@@ -27,13 +27,12 @@ main =
 -- MODEL
 
 
-type Model
-    = Model
-        { continents : Maybe (Array Continent)
-        , originAirport : AirportInfo
-        , destinationAirport : AirportInfo
-        , date : Maybe String
-        }
+type alias Model =
+    { continents : Maybe (Array Continent)
+    , originAirport : AirportInfo
+    , destinationAirport : AirportInfo
+    , date : Maybe String
+    }
 
 
 type alias AirportInfo =
@@ -44,25 +43,23 @@ type alias AirportInfo =
 
 
 setOriginAirport : AirportInfo -> Model -> Model
-setOriginAirport airportInfo (Model model) =
-    Model
-        { model | originAirport = airportInfo }
+setOriginAirport airportInfo model =
+    { model | originAirport = airportInfo }
 
 
 setDestinationAirport : AirportInfo -> Model -> Model
-setDestinationAirport airportInfo (Model model) =
-    Model
-        { model | originAirport = airportInfo }
+setDestinationAirport airportInfo model =
+    { model | originAirport = airportInfo }
 
 
 setAirportContinent : Continent -> AirportInfo -> AirportInfo
-setAirportContinent continent model =
-    { model | continent = Just continent }
+setAirportContinent continent airportInfo =
+    { airportInfo | continent = Just continent }
 
 
 setAirportCountry : Country -> AirportInfo -> AirportInfo
-setAirportCountry country model =
-    { model | country = Just country }
+setAirportCountry country airportInfo =
+    { airportInfo | country = Just country }
 
 
 type Continent
@@ -92,7 +89,7 @@ init _ =
         emptyAirportInfo =
             { continent = Nothing, country = Nothing, countryOptions = Nothing }
     in
-    ( Model { continents = Nothing, originAirport = emptyAirportInfo, destinationAirport = emptyAirportInfo, date = Nothing }
+    ( { continents = Nothing, originAirport = emptyAirportInfo, destinationAirport = emptyAirportInfo, date = Nothing }
     , Http.get
         { url = "http://localhost:5000/get_continents"
         , expect = Http.expectJson GotContinents continentDecoder
@@ -118,15 +115,15 @@ continentDecoder =
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg (Model model) =
+update msg model =
     case msg of
         GotContinents res ->
             case res of
                 Ok contArray ->
-                    ( Model { model | continents = Just contArray }, Cmd.none )
+                    ( { model | continents = Just contArray }, Cmd.none )
 
                 Err _ ->
-                    ( Model model, Cmd.none )
+                    ( model, Cmd.none )
 
         UpdateOriginContinent selected ->
             let
@@ -134,7 +131,7 @@ update msg (Model model) =
                     setAirportContinent (Continent selected) model.originAirport
 
                 finalModel =
-                    Model model
+                    model
                         |> setOriginAirport newAirportInfo
             in
             ( finalModel, Cmd.none )
@@ -145,7 +142,7 @@ update msg (Model model) =
                     setAirportContinent (Continent selected) model.destinationAirport
 
                 finalModel =
-                    Model model
+                    model
                         |> setDestinationAirport newAirportInfo
             in
             ( finalModel, Cmd.none )
@@ -156,7 +153,7 @@ update msg (Model model) =
                     setAirportCountry (Country selected) model.originAirport
 
                 finalModel =
-                    Model model
+                    model
                         |> setOriginAirport newAirportInfo
             in
             ( finalModel, Cmd.none )
@@ -167,7 +164,7 @@ update msg (Model model) =
                     setAirportCountry (Country selected) model.destinationAirport
 
                 finalModel =
-                    Model model
+                    model
                         |> setDestinationAirport newAirportInfo
             in
             ( finalModel, Cmd.none )
@@ -188,7 +185,7 @@ subscriptions _ =
 
 
 view : Model -> Html Msg
-view (Model model) =
+view model =
     let
         airportOptionsHtml : Array Continent -> String -> (String -> Msg) -> Maybe Continent -> Html Msg
         airportOptionsHtml contArray nameStr appMsg currentCont =
