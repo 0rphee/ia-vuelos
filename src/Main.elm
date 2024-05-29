@@ -1,14 +1,13 @@
 module Main exposing (Model, Msg(..), init, main, subscriptions, update, view)
 
-import Array exposing (Array)
 import Browser
 import Debug exposing (todo)
 import Dict exposing (Dict)
-import Html exposing (Html, div, h1, option, pre, select, text)
+import Html exposing (Html, div, h1, option, select, text)
 import Html.Attributes exposing (value)
 import Html.Events exposing (onInput)
 import Http
-import Json.Decode as Json exposing (Decoder, array, string)
+import Json.Decode as Json exposing (Decoder)
 
 
 
@@ -30,8 +29,7 @@ main =
 
 
 type alias Model =
-    { continents : Maybe (Array Continent)
-    , originAirport : FinalNodesInfo
+    { originAirport : FinalNodesInfo
     , destinationAirport : FinalNodesInfo
     , date : Maybe String
     }
@@ -46,12 +44,33 @@ type alias FinalNodesInfo =
     }
 
 
+type Continent
+    = Continent { code : String, name : String }
+
+
+type Country
+    = Country { code : String, name : String }
+
+
 type Airport
     = Airport
         { id : Int
         , ident : String
         , name : String
         }
+
+
+continentDictionary : Dict String Continent
+continentDictionary =
+    Dict.fromList
+        [ ( "AS", Continent { code = "AS", name = "Asia" } )
+        , ( "AN", Continent { code = "AN", name = "Antarctica" } )
+        , ( "AF", Continent { code = "AF", name = "Africa" } )
+        , ( "OC", Continent { code = "OC", name = "Oceania" } )
+        , ( "EU", Continent { code = "EU", name = "Europe" } )
+        , ( "NA", Continent { code = "NA", name = "North America" } )
+        , ( "SA", Continent { code = "SA", name = "South America" } )
+        ]
 
 
 setOriginNode : FinalNodesInfo -> Model -> Model
@@ -87,19 +106,6 @@ setNodeAirport country airportInfo =
 setNodeAirportOptions : Maybe (Dict Int Airport) -> FinalNodesInfo -> FinalNodesInfo
 setNodeAirportOptions airportOptions airportInfo =
     { airportInfo | airportOptions = airportOptions }
-
-
-type Continent
-    = Continent String
-
-
-continentToString : Continent -> String
-continentToString (Continent s) =
-    s
-
-
-type Country
-    = Country { code : String, name : String }
 
 
 countryToString : Country -> String
@@ -140,11 +146,8 @@ init _ =
         emptyAirportInfo =
             { selectedContinent = Nothing, selectedCountry = Nothing, countryOptions = Nothing, airportOptions = Nothing, selectedAirport = Nothing }
     in
-    ( { continents = Nothing, originAirport = emptyAirportInfo, destinationAirport = emptyAirportInfo, date = Nothing }
-    , Http.get
-        { url = "http://localhost:5000/get_continents"
-        , expect = Http.expectJson GotContinents continentDecoder
-        }
+    ( { originAirport = emptyAirportInfo, destinationAirport = emptyAirportInfo, date = Nothing }
+    , Cmd.none
     )
 
 
@@ -158,17 +161,11 @@ type WhichAirportChange
 
 
 type Msg
-    = GotContinents (Result Http.Error (Array Continent))
-    | UpdateContinent WhichAirportChange String
+    = UpdateContinent WhichAirportChange String
     | GotCountries WhichAirportChange (Result Http.Error (Dict String Country))
     | UpdateCountry WhichAirportChange String -- country iso_code
     | GotAirports WhichAirportChange (Result Http.Error (Dict Int Airport))
     | UpdateAirport WhichAirportChange Int -- airport id id
-
-
-continentDecoder : Decoder (Array Continent)
-continentDecoder =
-    array (Json.map Continent string)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -179,11 +176,6 @@ update msg model =
             Result.toMaybe <| Result.mapError (Debug.log "Request error") res
     in
     case msg of
-        GotContinents res ->
-            ( { model | continents = toMaybeWithLog res }
-            , Cmd.none
-            )
-
         GotCountries originOrDestinationChange countryDictRes ->
             let
                 updateNodeInfo : FinalNodesInfo -> FinalNodesInfo
@@ -228,12 +220,13 @@ update msg model =
             in
             ( finalModel, Cmd.none )
 
-        UpdateContinent originOrDestinationChange selectedContinent ->
+        UpdateContinent originOrDestinationChange selectedContinentCode ->
             let
                 updateNodeInfo : FinalNodesInfo -> FinalNodesInfo
                 updateNodeInfo airport =
-                    setNodeContinent (Just (Continent selectedContinent)) airport
+                    setNodeContinent (Dict.get selectedContinentCode continentDictionary) airport
 
+                -- (Just (Continent selectedContinentCode)) airport
                 finalModel : Model
                 finalModel =
                     case originOrDestinationChange of
@@ -245,7 +238,7 @@ update msg model =
             in
             ( finalModel
             , Http.get
-                { url = "http://localhost:5000/get_countries?continent=" ++ selectedContinent
+                { url = "http://localhost:5000/get_countries?continent=" ++ selectedContinentCode
                 , expect = Http.expectJson (GotCountries originOrDestinationChange) countryDecoder
                 }
             )
@@ -328,7 +321,7 @@ subscriptions _ =
 view : Model -> Html Msg
 view model =
     let
-        debugModel =
+        _ =
             Debug.log "model " model
 
         toInt : String -> Int
@@ -340,11 +333,11 @@ view model =
                 Nothing ->
                     todo "toInt failure"
 
-        continentSelector : Array Continent -> (String -> Msg) -> Html Msg
-        continentSelector continents msgConstructor =
+        continentSelector : (String -> Msg) -> Html Msg
+        continentSelector msgConstructor =
             select [ onInput msgConstructor ]
                 (option [ value "" ] [ text "Select a continent" ]
-                    :: List.map (\cont -> option [ value (continentToString cont) ] [ text (continentToString cont) ]) (Array.toList continents)
+                    :: List.map (\(Continent cont) -> option [ value cont.code ] [ text cont.name ]) (Dict.values continentDictionary)
                 )
 
         countrySelector : Dict String Country -> (String -> Msg) -> Html Msg
@@ -361,8 +354,8 @@ view model =
                     :: List.map (\( id, cont ) -> option [ value (String.fromInt id) ] [ text (airportToString cont) ]) (Dict.toList airports)
                 )
 
-        nodeOptionsHtml : Array Continent -> String -> (String -> Msg) -> (String -> Msg) -> (Int -> Msg) -> FinalNodesInfo -> Html Msg
-        nodeOptionsHtml contArray nameStr continentUpdateMsg countryUpdateMsg airportUpdateMsg airportInfo =
+        nodeOptionsHtml : String -> (String -> Msg) -> (String -> Msg) -> (Int -> Msg) -> FinalNodesInfo -> Html Msg
+        nodeOptionsHtml nameStr continentUpdateMsg countryUpdateMsg airportUpdateMsg airportInfo =
             let
                 countriesHtml : List (Html Msg)
                 countriesHtml =
@@ -385,7 +378,7 @@ view model =
                 divChildren : List (Html Msg)
                 divChildren =
                     [ h1 [] [ text (nameStr ++ " Airport") ]
-                    , div [] [ text (nameStr ++ " Continent: "), continentSelector contArray continentUpdateMsg ]
+                    , div [] [ text (nameStr ++ " Continent: "), continentSelector continentUpdateMsg ]
                     ]
                         ++ countriesHtml
                         ++ airportsHtml
@@ -394,14 +387,9 @@ view model =
 
         aiportsHtml : Html Msg
         aiportsHtml =
-            case model.continents of
-                Just contArray ->
-                    div []
-                        [ nodeOptionsHtml contArray "Origin" (UpdateContinent OriginChange) (UpdateCountry OriginChange) (UpdateAirport OriginChange) model.originAirport
-                        , nodeOptionsHtml contArray "Destination" (UpdateContinent DestinationChange) (UpdateCountry DestinationChange) (UpdateAirport DestinationChange) model.destinationAirport
-                        ]
-
-                Nothing ->
-                    pre [] [ text "Loading continents..." ]
+            div []
+                [ nodeOptionsHtml "Origin" (UpdateContinent OriginChange) (UpdateCountry OriginChange) (UpdateAirport OriginChange) model.originAirport
+                , nodeOptionsHtml "Destination" (UpdateContinent DestinationChange) (UpdateCountry DestinationChange) (UpdateAirport DestinationChange) model.destinationAirport
+                ]
     in
     aiportsHtml
