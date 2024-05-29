@@ -30,12 +30,39 @@ main =
 type Model
     = Model
         { continents : Maybe (Array Continent)
-        , originContinent : Maybe Continent
-        , destinationContinent : Maybe Continent
-        , originCountry : Maybe Country
-        , destinationCountry : Maybe Country
+        , originAirport : AirportInfo
+        , destinationAirport : AirportInfo
         , date : Maybe String
         }
+
+
+type alias AirportInfo =
+    { continent : Maybe Continent
+    , country : Maybe Country
+    , countryOptions : Maybe (Array Country)
+    }
+
+
+setOriginAirport : AirportInfo -> Model -> Model
+setOriginAirport airportInfo (Model model) =
+    Model
+        { model | originAirport = airportInfo }
+
+
+setDestinationAirport : AirportInfo -> Model -> Model
+setDestinationAirport airportInfo (Model model) =
+    Model
+        { model | originAirport = airportInfo }
+
+
+setAirportContinent : Continent -> AirportInfo -> AirportInfo
+setAirportContinent continent model =
+    { model | continent = Just continent }
+
+
+setAirportCountry : Country -> AirportInfo -> AirportInfo
+setAirportCountry country model =
+    { model | country = Just country }
 
 
 type Continent
@@ -61,7 +88,11 @@ arrayToString arr toString =
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Model { continents = Nothing, originContinent = Nothing, destinationContinent = Nothing, originCountry = Nothing, destinationCountry = Nothing, date = Nothing }
+    let
+        emptyAirportInfo =
+            { continent = Nothing, country = Nothing, countryOptions = Nothing }
+    in
+    ( Model { continents = Nothing, originAirport = emptyAirportInfo, destinationAirport = emptyAirportInfo, date = Nothing }
     , Http.get
         { url = "http://localhost:5000/get_continents"
         , expect = Http.expectJson GotContinents continentDecoder
@@ -98,19 +129,52 @@ update msg (Model model) =
                     ( Model model, Cmd.none )
 
         UpdateOriginContinent selected ->
-            ( Model { model | originContinent = Just (Continent selected) }, Cmd.none )
+            let
+                newAirportInfo =
+                    setAirportContinent (Continent selected) model.originAirport
+
+                finalModel =
+                    Model model
+                        |> setOriginAirport newAirportInfo
+            in
+            ( finalModel, Cmd.none )
 
         UpdateDestinationContinent selected ->
-            ( Model { model | destinationContinent = Just (Continent selected) }, Cmd.none )
+            let
+                newAirportInfo =
+                    setAirportContinent (Continent selected) model.destinationAirport
+
+                finalModel =
+                    Model model
+                        |> setDestinationAirport newAirportInfo
+            in
+            ( finalModel, Cmd.none )
 
         UpdateOriginCountry selected ->
-            ( Model { model | originCountry = Just (Country selected) }, Cmd.none )
+            let
+                newAirportInfo =
+                    setAirportCountry (Country selected) model.originAirport
+
+                finalModel =
+                    Model model
+                        |> setOriginAirport newAirportInfo
+            in
+            ( finalModel, Cmd.none )
 
         UpdateDestinationCountry selected ->
-            ( Model { model | destinationCountry = Just (Country selected) }, Cmd.none )
+            let
+                newAirportInfo =
+                    setAirportCountry (Country selected) model.destinationAirport
+
+                finalModel =
+                    Model model
+                        |> setDestinationAirport newAirportInfo
+            in
+            ( finalModel, Cmd.none )
 
 
 
+-- ( Model { model | destinationCountry = Just (Country selected) }, Cmd.none )
 -- SUBSCRIPTIONS
 
 
@@ -139,8 +203,8 @@ view (Model model) =
             case model.continents of
                 Just contArray ->
                     div []
-                        [ airportOptionsHtml contArray "Origin" UpdateOriginContinent model.originContinent
-                        , airportOptionsHtml contArray "Destination" UpdateDestinationContinent model.destinationContinent
+                        [ airportOptionsHtml contArray "Origin" UpdateOriginContinent model.originAirport.continent
+                        , airportOptionsHtml contArray "Destination" UpdateDestinationContinent model.destinationAirport.continent
                         ]
 
                 Nothing ->
