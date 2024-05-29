@@ -4,3 +4,5 @@ sqlalchemy==2.0.30
 sqlalchemy-utils==0.41.2
 flask==3.0.3
 flask-caching==2.1.0
+Flask-Cors==4.0.0
+pyopenssl

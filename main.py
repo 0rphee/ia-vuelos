@@ -1,6 +1,7 @@
 from datetime import datetime
 
-from flask import Flask, app, render_template, request
+from flask import Flask, app, jsonify, render_template, request
+from flask_cors import CORS, cross_origin
 from sqlalchemy import (
     create_engine,
     select,
@@ -8,7 +9,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import sessionmaker
 
 from ia_vuelos.lib import a_star, print_camino
-from ia_vuelos.sqlalchemy import Airport
+from ia_vuelos.sqlalchemy import Airport, Country
 
 # sqlalchemy
 DB_CONNECTION_URL = "mysql+mysqlconnector://root:root@localhost:3306/fly_data"
@@ -18,16 +19,13 @@ SessionLocal = sessionmaker(autocommit=False, bind=engine)
 
 # flask
 app = Flask(__name__)
-
-
-def get_airports():
-    with SessionLocal() as session:
-        airports = session.query(Airport).all()
-    return airports
+cors = CORS(app)
+app.config["CORS_HEADERS"] = "Content-Type"
 
 
 @app.route("/", methods=["GET", "POST"])
-def index() -> str:
+@cross_origin()
+def index():
     if request.method == "POST":
         departure_airport_id = request.form["departure_airport"]
         arrival_airport_id = request.form["arrival_airport"]
@@ -46,14 +44,41 @@ def index() -> str:
             path, final_airport = a_star(session, departure_airport, arrival_airport, date)
 
         print_camino(path, final_airport)
-        return render_template("result.html", path=path, final_airport=final_airport)
+        return render_template("res.html", path=path, final_airport=final_airport)
 
-    airports = get_airports()
-    return render_template("index.html", airports=airports)
+    with SessionLocal() as session:
+        continents = session.query(Country.continent).distinct().all()
+    return render_template("ind.html", continents=continents)
+
+
+@cross_origin()
+@app.route("/get_continents", methods=["GET"])
+def get_continents():
+    with SessionLocal() as session:
+        continents = session.query(Country.continent).distinct().all()
+    return jsonify([str(continent[0]) for continent in continents])
+
+
+@app.route("/get_countries", methods=["POST"])
+@cross_origin()
+def get_countries():
+    continent = request.json["continent"]
+    with SessionLocal() as session:
+        countries = session.query(Country).filter_by(continent=continent).all()
+    return jsonify([country.name for country in countries])
+
+
+@app.route("/get_airports", methods=["POST"])
+@cross_origin()
+def get_airports():
+    country = request.json["country"]
+    with SessionLocal() as session:
+        airports = session.query(Airport).filter_by(iso_country=country).all()
+    return jsonify([{"id": airport.id, "name": airport.name} for airport in airports])
 
 
 def main():
-    app.run(debug=True)
+    app.run(debug=True)  # , ssl_context="adhoc")
 
 
 # def main():
