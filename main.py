@@ -13,7 +13,7 @@ from ia_vuelos.sqlalchemy import Airport, Country
 
 # sqlalchemy
 DB_CONNECTION_URL = "mysql+mysqlconnector://root:root@localhost:3306/fly_data"
-engine = create_engine(DB_CONNECTION_URL, echo=False)  # echo=True shows the sql statements
+engine = create_engine(DB_CONNECTION_URL, echo=False)  # echo="debug" shows the sql statements
 # Base.metadata.create_all(engine)
 SessionLocal = sessionmaker(autocommit=False, bind=engine)
 
@@ -26,29 +26,30 @@ app.config["CORS_HEADERS"] = "Content-Type"
 @app.route("/", methods=["GET", "POST"])
 @cross_origin()
 def index():
-    if request.method == "POST":
-        departure_airport_id = request.form["departure_airport"]
-        arrival_airport_id = request.form["arrival_airport"]
-        date_str = request.form["date"]
-        date = datetime.strptime(date_str, "%Y-%m-%d")
+    return "helloworld"
+    # if request.method == "POST":
+    #     departure_airport_id = request.form["departure_airport"]
+    #     arrival_airport_id = request.form["arrival_airport"]
+    #     date_str = request.form["date"]
+    #     date = datetime.strptime(date_str, "%Y-%m-%d")
 
-        with SessionLocal() as session:
-            departure_airport = (
-                session.query(Airport).filter(Airport.id == departure_airport_id).first()
-            )
-            arrival_airport = (
-                session.query(Airport).filter(Airport.id == arrival_airport_id).first()
-            )
+    #     with SessionLocal() as session:
+    #         departure_airport = (
+    #             session.query(Airport).filter(Airport.id == departure_airport_id).first()
+    #         )
+    #         arrival_airport = (
+    #             session.query(Airport).filter(Airport.id == arrival_airport_id).first()
+    #         )
 
-            # Call the A* function
-            path, final_airport = a_star(session, departure_airport, arrival_airport, date)
+    #         # Call the A* function
+    #         path, final_airport = a_star(session, departure_airport, arrival_airport, date)
 
-        print_camino(path, final_airport)
-        return render_template("res.html", path=path, final_airport=final_airport)
+    #     print_camino(path, final_airport)
+    #     return render_template("res.html", path=path, final_airport=final_airport)
 
-    with SessionLocal() as session:
-        continents = session.query(Country.continent).distinct().all()
-    return render_template("ind.html", continents=continents)
+    # with SessionLocal() as session:
+    #     continents = session.query(Country.continent).distinct().all()
+    # return render_template("ind.html", continents=continents)
 
 
 @cross_origin()
@@ -102,34 +103,92 @@ def get_airports():
     )
 
 
+@app.route("/get_path", methods=["GET"])
+@cross_origin()
+def get_path():
+    origin_id = request.args.get("origin_id")
+    destination_id = request.args.get("destination_id")
+    date_str = request.args.get("date")
+
+    if not origin_id or not destination_id or not date_str:
+        return (
+            jsonify({"error": "origin_id, destination_id, and date parameters are required"}),
+            400,
+        )
+
+    try:
+        # Parse the date parameter
+        date = datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
+
+    with SessionLocal() as session:
+        departure_airport = session.query(Airport).filter(Airport.id == origin_id).first()
+        arrival_airport = session.query(Airport).filter(Airport.id == destination_id).first()
+        print(departure_airport.pretty_str())
+        print(arrival_airport.pretty_str())
+
+        if not departure_airport or not arrival_airport:
+            return jsonify({"error": "Invalid origin_id or destination_id"}), 404
+
+        path, final_airport = a_star(session, departure_airport, arrival_airport, date)
+
+    print_camino(path, final_airport)
+    path = [
+        {"airport": airport.to_dict(), "next_flight": flight.to_dict()} for airport, flight in path
+    ]
+
+    return jsonify({"path": path, "final_airport": final_airport.to_dict()})
+
+
+def main_alt():
+    def search(session, orig, dest):
+        fst = session.execute(select(Airport).where(Airport.id == orig).limit(1)).scalar_one()
+
+        snd = session.execute(select(Airport).where(Airport.id == dest).limit(1)).scalar_one()
+
+        print(fst.pretty_str())
+        print(snd.pretty_str())
+
+        camino_resultante, aeropuerto_final = a_star(session, fst, snd, imprimir=True)
+        print_camino(camino_resultante, aeropuerto_final)
+
+    with SessionLocal() as session:
+        # 4731 MMMX large_airport Aeropuerto Internacional Lic. Benito Juárez
+        # 2434 EGLL large_airport London Heathrow Airport
+        # origin_airport_id = 4731
+        # destination_airport_id = 2434
+
+        # cdmx_benito_juarez = session.execute(
+        #     select(Airport).where(Airport.id == origin_airport_id).limit(1)
+        # ).scalar_one()
+
+        # london_heathrow = session.execute(
+        #     select(Airport).where(Airport.id == destination_airport_id).limit(1)
+        # ).scalar_one()
+
+        # juan_alvarez = session.execute(
+        #     select(Airport).where(Airport.id == 4688).limit(1)
+        # ).scalar_one()
+
+        # print(cdmx_benito_juarez.pretty_str())
+        # print(juan_alvarez.pretty_str())
+
+        # camino_resultante, aeropuerto_final = a_star(
+        #     session, cdmx_benito_juarez, juan_alvarez, imprimir=False
+        # )
+        # camino_resultante, aeropuerto_final = a_star(
+        #     session, cdmx_benito_juarez, london_heathrow, imprimir=False
+        # )
+        # print_camino(camino_resultante, aeropuerto_final)
+
+        search(session, 3, 26955)
+
+
 def main():
     app.run(debug=True)  # , ssl_context="adhoc")
 
 
-# def main():
-#     # Create an engine and a session
-#     # CONNECTION_URL = "mysql+mysqlconnector://username:password@localhost/fly_data"
-#     # CONNECTION_URL = "mysql+mysqlconnector://root:root@db:3306/fly_data"
-
-#     with SessionLocal() as session:
-#         # 4731 MMMX large_airport Aeropuerto Internacional Lic. Benito Juárez
-#         # 2434 EGLL large_airport London Heathrow Airport
-#         origin_airport_id = 4731
-#         destination_airport_id = 2434
-
-#         cdmx_benito_juarez = session.execute(
-#             select(Airport).where(Airport.id == origin_airport_id).limit(1)
-#         ).scalar_one()
-
-#         london_heathrow = session.execute(
-#             select(Airport).where(Airport.id == destination_airport_id).limit(1)
-#         ).scalar_one()
-
-#         camino_resultante, aeropuerto_final = a_star(
-#             session, cdmx_benito_juarez, london_heathrow, imprimir=False
-#         )
-#         print_camino(camino_resultante, aeropuerto_final)
-
-
 if __name__ == "__main__":
     main()
+    # main_alt()

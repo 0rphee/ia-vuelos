@@ -23,7 +23,7 @@ def print_camino(airport_flight_history: list[tuple[Airport, Flight]], aeropuert
         )
     )
 
-    string += string + f"\n\n{'-'*18}\nFINAL DESTINATION: {aeropuerto_final.pretty_str()}"
+    string += string + f"{arrow_text}{'-'*18}\nFINAL DESTINATION: {aeropuerto_final.pretty_str()}"
 
     print(f"\n{'='*10}")
     print("RESULTADO DE LA BÚSQUEDA:")

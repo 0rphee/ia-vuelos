@@ -150,10 +150,10 @@ def generate_flights(cursor: MySQLCursor):
     for curr_orig_airport in all_airports:
         flights_per_day: int = 0
         if curr_orig_airport.type == "large_airport":
-            flights_per_day = random.randint(5, 10)
+            flights_per_day = random.randint(10, 15)
             long_haul_flights = floor(flights_per_day * 0.5)
         else:
-            flights_per_day = random.randint(1, 5)
+            flights_per_day = random.randint(5, 10)
             long_haul_flights = floor(flights_per_day * 0.2)
         short_haul_flights = flights_per_day - long_haul_flights
 
@@ -197,7 +197,7 @@ def generate_flights(cursor: MySQLCursor):
 def create_flights_table(cursor: MySQLCursor):
     create_table_query = """
     CREATE TABLE IF NOT EXISTS flights (
-        flight_id VARCHAR(10) PRIMARY KEY,
+        flight_id VARCHAR(11) PRIMARY KEY,
         model VARCHAR(50),
         price_business FLOAT,
         price_economy FLOAT,

@@ -26,7 +26,7 @@ class Base(DeclarativeBase):
 class Flight(Base):
     __tablename__ = "flights"
 
-    flight_id = Column(String(10), primary_key=True)
+    flight_id = Column(String(11), primary_key=True)
     model = Column(String(50))
     price_business = Column(Float)
     price_economy = Column(Float)
@@ -76,6 +76,18 @@ Flight:
     arrival_time = {self.arrival_time!s}
     departure_airport_id = {self.departure_airport_id!s}
     arrival_airport_id = {self.arrival_airport_id}"""
+
+    def to_dict(self):
+        return {
+            "flight_id": self.flight_id,
+            "model": self.model,
+            "price_business": self.price_business,
+            "price_economy": self.price_economy,
+            "departure_time": self.departure_time.isoformat() if self.departure_time else None,
+            "arrival_time": self.arrival_time.isoformat() if self.arrival_time else None,
+            "departure_airport_id": self.departure_airport_id,
+            "arrival_airport_id": self.arrival_airport_id,
+        }
 
 
 class Airport(Base):
@@ -206,6 +218,16 @@ Airport:
                 (airport2.latitude_deg, airport2.longitude_deg),
             ).km
         )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "ident": self.ident,
+            "name": self.name,
+            "continent": self.continent,
+            "iso_country": self.iso_country,
+            "iso_region": self.iso_region,
+        }
 
 
 class Country(Base):
