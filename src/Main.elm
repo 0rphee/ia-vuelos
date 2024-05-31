@@ -2,10 +2,9 @@ module Main exposing (Model, Msg(..), init, main, subscriptions, update, view)
 
 import Browser
 import Date exposing (Date)
-import Debug exposing (todo)
 import Dict exposing (Dict)
 import Html exposing (Html, button, div, h1, h2, h3, input, li, option, p, select, text, ul)
-import Html.Attributes exposing (default, href, placeholder, rel, type_, value)
+import Html.Attributes exposing (href, placeholder, rel, type_, value)
 import Html.Events exposing (onClick, onInput)
 import Http
 import Json.Decode as Json exposing (Decoder)
@@ -252,7 +251,7 @@ update msg model =
     let
         resToMaybeWithLog : Result a b -> Maybe b
         resToMaybeWithLog res =
-            Result.toMaybe <| Result.mapError (Debug.log "Request error") res
+            Result.toMaybe <| res
 
         gotFinalModel : (Maybe good -> FinalNodesInfo -> FinalNodesInfo) -> WhichAirportChange -> Result e good -> Model
         gotFinalModel setter originOrDestinationChange dictRes =
@@ -375,9 +374,6 @@ subscriptions _ =
 view : Model -> Html Msg
 view model =
     let
-        _ =
-            Debug.log "model " model
-
         toInt : String -> Int
         toInt s =
             -- it should be impossible for this to fail

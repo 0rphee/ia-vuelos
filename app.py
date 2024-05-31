@@ -26,30 +26,7 @@ app.config["CORS_HEADERS"] = "Content-Type"
 @app.route("/", methods=["GET", "POST"])
 @cross_origin()
 def index():
-    return "helloworld"
-    # if request.method == "POST":
-    #     departure_airport_id = request.form["departure_airport"]
-    #     arrival_airport_id = request.form["arrival_airport"]
-    #     date_str = request.form["date"]
-    #     date = datetime.strptime(date_str, "%Y-%m-%d")
-
-    #     with SessionLocal() as session:
-    #         departure_airport = (
-    #             session.query(Airport).filter(Airport.id == departure_airport_id).first()
-    #         )
-    #         arrival_airport = (
-    #             session.query(Airport).filter(Airport.id == arrival_airport_id).first()
-    #         )
-
-    #         # Call the A* function
-    #         path, final_airport = a_star(session, departure_airport, arrival_airport, date)
-
-    #     print_camino(path, final_airport)
-    #     return render_template("res.html", path=path, final_airport=final_airport)
-
-    # with SessionLocal() as session:
-    #     continents = session.query(Country.continent).distinct().all()
-    # return render_template("ind.html", continents=continents)
+    return app.send_static_file("index.html")
 
 
 @cross_origin()
@@ -154,34 +131,6 @@ def main_alt():
         print_camino(camino_resultante, aeropuerto_final)
 
     with SessionLocal() as session:
-        # 4731 MMMX large_airport Aeropuerto Internacional Lic. Benito Juárez
-        # 2434 EGLL large_airport London Heathrow Airport
-        # origin_airport_id = 4731
-        # destination_airport_id = 2434
-
-        # cdmx_benito_juarez = session.execute(
-        #     select(Airport).where(Airport.id == origin_airport_id).limit(1)
-        # ).scalar_one()
-
-        # london_heathrow = session.execute(
-        #     select(Airport).where(Airport.id == destination_airport_id).limit(1)
-        # ).scalar_one()
-
-        # juan_alvarez = session.execute(
-        #     select(Airport).where(Airport.id == 4688).limit(1)
-        # ).scalar_one()
-
-        # print(cdmx_benito_juarez.pretty_str())
-        # print(juan_alvarez.pretty_str())
-
-        # camino_resultante, aeropuerto_final = a_star(
-        #     session, cdmx_benito_juarez, juan_alvarez, imprimir=False
-        # )
-        # camino_resultante, aeropuerto_final = a_star(
-        #     session, cdmx_benito_juarez, london_heathrow, imprimir=False
-        # )
-        # print_camino(camino_resultante, aeropuerto_final)
-
         search(session, 3, 26955)
 
 

@@ -5,6 +5,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.python
+    environment:
+      FLASK_RUN_PORT: 8000
+      FLASK_RUN_HOST: 0.0.0.0
     ports:
       - "8000:8000"
     depends_on:

@@ -29,21 +29,30 @@ Alternativamente, se puede usar este comando para lanzarlos otra vez cada que se
 docker compose watch
 ```
 
+- PhpMyAdmin (para el manejo de MySql) estará disponible en <http://localhost:8080/> (con usuario root, contraseña root).
+- Y la aplicación estará en <http://localhost:8000/>.
+
 ## Dependencias
 
-Se usa `pipreqs`: <https://github.com/bndr/pipreqs>.
-
-Para actualizar `requirements.txt` basado en las dependencias utilizadas en el código.
-
-```sh
-pipreqs --ignore .venv
-```
-
 Para installar localmente las dependencias:
+
+### Python: 
 
 ```sh
 pip3 install -r requirements.txt
 ```
+
+### Elm:
+
+```
+# Se necesita tener instalado node.
+npm install -g elm
+
+elm make src/Main.elm --optimize --output=static/index.html
+
+# o se puede user `elm reactor` para tener un servidor interactivo de Elm.
+```
+
 
 ## Datos
 
@@ -54,15 +63,19 @@ El dataset de los aeropuertos fue obtenido de <https://ourairports.com/data/>. (
 ```sh
 # Se ejecuta esto en la misma terminal, si no funciona leer siguiente párrafo
 mkdir data
-curl 'https://drive.usercontent.google.com/download?confirm=xxx&id=1v-btRsoMaFFdufc1zzx8zPPMt21-NcO0' -o data/airports.csv
+curl 'https://davidmegginson.github.io/ourairports-data/airports.csv' -o data/airports.csv
+curl 'https://davidmegginson.github.io/ourairports-data/countries.csv' -o data/countries.csv
+curl 'https://davidmegginson.github.io/ourairports-data/regions.csv' -o data/regions.csv
 ```
 
-Si el comando anterior no funciona, se descarga el archivo `airports.csv` y colocarlo en `data/`, de <https://drive.usercontent.google.com/download?confirm=xxx&id=1v-btRsoMaFFdufc1zzx8zPPMt21-NcO0>.
+Si el comando anterior no funciona, se descargan manualmente los archivos `airports.csv`, `countries.csv` y `regions.csv` de <https://ourairports.com/data/>, y colocarlos en `data/`. 
 
-Una vez descargado, se debe el servicio de docker de mysql debe estar corriendo, y se insertan la información a la base de datos ejecutando:
+Una vez descargado, se debe el servicio de docker de mysql debe estar corriendo, y se insertan la información a la base de datos ejecutando (esto con la base de datos corriendo):
 
 ```sh
-python3 scripts/populate_airports.py
+python3 scripts/populate_countries.py
+python3 scripts/populate_regions.py
+python3 scripts/populate_airports.py 
 python3 scripts/populate_flights.py
 ```
 
